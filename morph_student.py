@@ -87,13 +87,13 @@ def _tri_bbox(tri, W, H):
     """
     Retorna bounding box inteiro (xmin,xmax,ymin,ymax), recortado ao domínio [0..W-1],[0..H-1].
     """
-    # 1. Encontra os valores flutuantes mínimos e máximos (x, y) do triângulo
+    # Encontra os valores flutuantes mínimos e máximos (x, y) do triângulo
     # min_coords será [xmin_f, ymin_f]
     # max_coords será [xmax_f, ymax_f]
     min_coords = np.amin(tri, axis=0)
     max_coords = np.amax(tri, axis=0)
 
-    # 2. Converte para coordenadas inteiras
+    # Converte para coordenadas inteiras
     # Usamos floor() para o mínimo e ceil() para o máximo para garantir
     # que o bounding box contenha totalmente o triângulo.
     xmin_i = np.floor(min_coords[0]).astype(int)
@@ -101,7 +101,7 @@ def _tri_bbox(tri, W, H):
     xmax_i = np.ceil(max_coords[0]).astype(int)
     ymax_i = np.ceil(max_coords[1]).astype(int)
 
-    # 3. Recorta (clip) os valores ao domínio da imagem
+    # Recorta (clip) os valores ao domínio da imagem
     # O domínio vai de 0 até W-1 (para x) e 0 até H-1 (para y).
     xmin = np.clip(xmin_i, 0, W - 1)
     xmax = np.clip(xmax_i, 0, W - 1)
@@ -118,38 +118,37 @@ def _amostra_bilinear(img_float, x, y):
     # Pega as dimensões da imagem
     H, W = img_float.shape[:2]
 
-    # 1. Encontra os 4 vizinhos com coordenadas inteiras
+    # Encontra os 4 vizinhos com coordenadas inteiras
     x1 = int(np.floor(x))
     y1 = int(np.floor(y))
     x2 = x1 + 1
     y2 = y1 + 1
 
-    # 2. Calcula os pesos da interpolação (partes fracionárias)
+    # Calcula os pesos da interpolação (partes fracionárias)
     # (dx, dy) estarão no intervalo [0, 1)
     dx = x - x1
     dy = y - y1
 
-    # 3. Faz o "clamp" (recorte) dos índices para ficarem dentro da imagem
+    # Faz o "clamp" (recorte) dos índices para ficarem dentro da imagem
     # Isso garante que não vamos tentar ler pixels fora das bordas.
     x1_c = np.clip(x1, 0, W - 1)
     y1_c = np.clip(y1, 0, H - 1)
     x2_c = np.clip(x2, 0, W - 1)
     y2_c = np.clip(y2, 0, H - 1)
 
-    # 4. Pega as cores (vetores RGB) dos 4 pixels vizinhos
-    # Lembre-se que a indexação do NumPy é (linha, coluna) -> (y, x)
+    # Pega as cores (vetores RGB) dos 4 pixels vizinhos
     Q11 = img_float[y1_c, x1_c]  # Canto superior esquerdo (y1, x1)
     Q21 = img_float[y1_c, x2_c]  # Canto superior direito (y1, x2)
     Q12 = img_float[y2_c, x1_c]  # Canto inferior esquerdo (y2, x1)
     Q22 = img_float[y2_c, x2_c]  # Canto inferior direito (y2, x2)
 
-    # 5. Interpola primeiro na direção X (horizontal)
+    # Interpola primeiro na direção X (horizontal)
     # Interpola na linha de cima (y1)
     R1 = (1.0 - dx) * Q11 + dx * Q21
     # Interpola na linha de baixo (y2)
     R2 = (1.0 - dx) * Q12 + dx * Q22
 
-    # 6. Interpola na direção Y (vertical) entre os resultados R1 e R2
+    # Interpola na direção Y (vertical) entre os resultados R1 e R2
     P = (1.0 - dy) * R1 + dy * R2
 
     return P
@@ -167,41 +166,36 @@ def gera_frame(A, B, pA, pB, triangles, alfa, beta):
     # Pega as dimensões da imagem
     H, W = A.shape[:2]
     
-    # 1. Calcula a geometria intermediária (p_dst)
+    # Calcula a geometria intermediária (p_dst)
     # Interpola os pontos de A e B usando 'alfa'
     p_dst = (1.0 - alfa) * pA + alfa * pB
 
-    # 2. Cria a imagem de saída (destino), inicialmente preta
+    # Cria a imagem de saída (destino), inicialmente preta
     frame_out = np.zeros_like(A)
 
-    # 3. Itera sobre cada triângulo na malha
+    # Itera sobre cada triângulo na malha
     for tri_indices in triangles:
         # Pega os vértices (coordenadas) do triângulo em A, B e no destino (dst)
         tri_A   = pA[tri_indices]    # (3, 2)
         tri_B   = pB[tri_indices]    # (3, 2)
         tri_dst = p_dst[tri_indices] # (3, 2)
 
-        # 4. Calcula o bounding box (caixa delimitadora) do triângulo de destino
-        # Isso otimiza o loop, para não termos que varrer a imagem inteira
+        # Calcula o bounding box (caixa delimitadora) do triângulo de destino
         xmin, xmax, ymin, ymax = _tri_bbox(tri_dst, W, H)
 
-        # 5. Itera sobre todos os pixels DENTRO do bounding box
-        # Nota: +1 pois o range() do Python exclui o valor final
+        # Itera sobre todos os pixels DENTRO do bounding box
         for y_dst in range(ymin, ymax + 1):
             for x_dst in range(xmin, xmax + 1):
                 pt_dst = np.array([x_dst, y_dst], dtype=np.float32)
 
-                # 6. Calcula as coordenadas baricêntricas de (x_dst, y_dst)
-                #    em relação ao triângulo de destino (tri_dst)
+                #Calcula as coordenadas baricêntricas de (x_dst, y_dst)
+                # em relação ao triângulo de destino (tri_dst)
                 w1, w2, w3 = _transf_baricentrica(pt_dst, tri_dst)
 
-                # 7. Verifica se o pixel está realmente dentro do triângulo
+                #Verifica se o pixel está realmente dentro do triângulo
                 if _check_bari(w1, w2, w3):
                     
-                    # 8. WARPING: Usa as coordenadas baricêntricas (w1,w2,w3) 
-                    #    para encontrar o pixel fonte correspondente em A e B
-                    
-                    # Ponto fonte em A (x_A, y_A)
+                    #Ponto fonte em A (x_A, y_A)
                     x_A = w1 * tri_A[0][0] + w2 * tri_A[1][0] + w3 * tri_A[2][0]
                     y_A = w1 * tri_A[0][1] + w2 * tri_A[1][1] + w3 * tri_A[2][1]
                     
@@ -209,15 +203,15 @@ def gera_frame(A, B, pA, pB, triangles, alfa, beta):
                     x_B = w1 * tri_B[0][0] + w2 * tri_B[1][0] + w3 * tri_B[2][0]
                     y_B = w1 * tri_B[0][1] + w2 * tri_B[1][1] + w3 * tri_B[2][1]
 
-                    # 9. AMOSTRAGEM: Pega as cores dos pontos fonte usando
-                    #    interpolação bilinear (pois (x_A,y_A) e (x_B,y_B) são floats)
+                    # Pega as cores dos pontos fonte usando
+                    # interpolação bilinear (pois (x_A,y_A) e (x_B,y_B) são floats)
                     color_A = _amostra_bilinear(A, x_A, y_A)
                     color_B = _amostra_bilinear(B, x_B, y_B)
 
-                    # 10. CROSS-FADE: Mistura as cores de A e B usando 'beta'
+                    # Mistura as cores de A e B usando 'beta'
                     final_color = (1.0 - beta) * color_A + beta * color_B
 
-                    # 11. Pinta o pixel de destino
+                    # Pinta o pixel de destino
                     frame_out[y_dst, x_dst] = final_color
 
     return frame_out
